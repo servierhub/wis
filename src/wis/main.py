@@ -15,7 +15,7 @@ import sys
 import libpnu
 
 # Version string used by the what(1) and ident(1) commands:
-ID = "@(#) $Id: wis - Bulk WHOIS search v1.0.1 (December 17, 2022) by Hubert Tournier $"
+ID = "@(#) $Id: wis - Bulk WHOIS search v1.0.2 (August 4, 2026) by Hubert Tournier $"
 
 # Default parameters. Can be overcome by environment variables, then command line options
 parameters = {
@@ -58,7 +58,9 @@ def _display_help():
     print("  -I|--inet6          Show only reformatted inet6num records", file=sys.stderr)
     print("  -r|--range          Show expanded inet(6)num ranges", file=sys.stderr)
     print("  -s|--summary        Show a summary of the type of matching records", file=sys.stderr)
-    print("  -S|--summaryonly    Show only a summary of the type of matching records", file=sys.stderr)
+    print("  -S|--summaryonly    Show only a summary of the type of matching records",
+        file=sys.stderr
+    )
     print("  --debug             Enable debug mode", file=sys.stderr)
     print("  --help|-?           Print usage and this help message and exit", file=sys.stderr)
     print("  --version           Print version and exit", file=sys.stderr)
@@ -67,24 +69,10 @@ def _display_help():
 
 
 ################################################################################
-def _handle_interrupts(signal_number, current_stack_frame):
-    """Prevent SIGINT signals from displaying an ugly stack trace"""
-    print(" Interrupted!\n", file=sys.stderr)
-    sys.exit(0)
-
-
-################################################################################
 def _process_environment_variables():
     """Process environment variables"""
-    # pylint: disable=C0103
-    global parameters
-    # pylint: enable=C0103
-
     if "WIS_DEBUG" in os.environ:
         logging.disable(logging.NOTSET)
-
-    logging.debug("_process_environment_variables(): parameters:")
-    logging.debug(parameters)
 
 
 ################################################################################
@@ -169,11 +157,6 @@ def _process_command_line():
             print(ID.replace("@(" + "#)" + " $" + "Id" + ": ", "").replace(" $", ""))
             sys.exit(0)
 
-    logging.debug("_process_command_line(): parameters:")
-    logging.debug(parameters)
-    logging.debug("_process_command_line(): remaining_arguments:")
-    logging.debug(remaining_arguments)
-
     return remaining_arguments
 
 
@@ -216,7 +199,7 @@ def process_inetnum_block(block):
     if parameters["Show expanded ranges"]:
         start_ip = ipaddress.IPv4Address(details["start"])
         end_ip = ipaddress.IPv4Address(details["stop"])
-        networks = [net for net in ipaddress.summarize_address_range(start_ip, end_ip)]
+        networks = list(ipaddress.summarize_address_range(start_ip, end_ip))
         for network in networks:
             for host in network:
                 last_host = network[-1]
@@ -227,26 +210,18 @@ def process_inetnum_block(block):
                 else:
                     address_type = "IP address"
 
-                print("{}{}{}{}{}{}{}{}{}{}{}{}{}".format(
-                    str(host), parameters["Field separator"],
-                    address_type, parameters["Field separator"],
-                    str(network), parameters["Field separator"],
-                    details["netname"], parameters["Field separator"],
-                    details["descr"], parameters["Field separator"],
-                    details["org"], parameters["Field separator"],
-                    details["country"]
-                ))
+                fs = parameters["Field separator"]
+                print(
+                    f'{str(host)}{fs}{address_type}{fs}{str(network)}{fs}{details["netname"]}{fs}'
+                    + f'{details["descr"]}{fs}{details["org"]}{fs}{details["country"]}'
+                )
 
     else:
-        print("{}{}{}{}{}{}{}{}{}{}{}".format(
-            details["start"], parameters["Field separator"],
-            details["stop"], parameters["Field separator"],
-            details["netname"], parameters["Field separator"],
-            details["descr"], parameters["Field separator"],
-            details["org"], parameters["Field separator"],
-            details["country"]
-        ))
-
+        fs = parameters["Field separator"]
+        print(
+            f'{details["start"]}{fs}{details["stop"]}{fs}{details["netname"]}{fs}{details["descr"]}'
+            + f'{fs}{details["org"]}{fs}{details["country"]}'
+        )
 
 ################################################################################
 def process_inet6num_block(block):
@@ -287,7 +262,7 @@ def process_inet6num_block(block):
     if parameters["Show expanded ranges"]:
         start_ip = ipaddress.IPv6Address(details["start"])
         end_ip = ipaddress.IPv6Address(details["stop"])
-        networks = [net for net in ipaddress.summarize_address_range(start_ip, end_ip)]
+        networks = list(ipaddress.summarize_address_range(start_ip, end_ip))
         for network in networks:
             for host in network:
                 last_host = network[-1]
@@ -298,26 +273,18 @@ def process_inet6num_block(block):
                 else:
                     address_type = "IP address"
 
-                print("{}{}{}{}{}{}{}{}{}{}{}{}{}".format(
-                    str(host), parameters["Field separator"],
-                    address_type, parameters["Field separator"],
-                    str(network), parameters["Field separator"],
-                    details["netname"], parameters["Field separator"],
-                    details["descr"], parameters["Field separator"],
-                    details["org"], parameters["Field separator"],
-                    details["country"]
-                ))
+                fs = parameters["Field separator"]
+                print(
+                    f'{str(host)}{fs}{address_type}{fs}{str(network)}{fs}{details["netname"]}{fs}'
+                    + f'{details["descr"]}{fs}{details["org"]}{fs}{details["country"]}'
+                )
 
     else:
-        print("{}{}{}{}{}{}{}{}{}{}{}".format(
-            details["start"], parameters["Field separator"],
-            details["stop"], parameters["Field separator"],
-            details["netname"], parameters["Field separator"],
-            details["descr"], parameters["Field separator"],
-            details["org"], parameters["Field separator"],
-            details["country"]
-        ))
-
+        fs = parameters["Field separator"]
+        print(
+            f'{details["start"]}{fs}{details["stop"]}{fs}{details["netname"]}{fs}{details["descr"]}'
+            + f'{fs}{details["org"]}{fs}{details["country"]}'
+        )
 
 ################################################################################
 def process_block(block):
@@ -403,7 +370,7 @@ def main():
     exit_status = 0
     program_name = os.path.basename(sys.argv[0])
     libpnu.initialize_debugging(program_name)
-    libpnu.handle_interrupt_signals(_handle_interrupts)
+    libpnu.handle_interrupt_signals(libpnu.interrupt_handler_function)
     _process_environment_variables()
 
     # Words we'll be searching for, if any:
@@ -412,13 +379,17 @@ def main():
     # Words we won't want in the results:
     if parameters["Excluded filename"]:
         if os.path.isfile(parameters["Excluded filename"]):
-            with open(parameters["Excluded filename"], "rt", encoding="utf-8", errors="ignore") as file:
+            with open(parameters["Excluded filename"], "rt", encoding="utf-8", errors="ignore") \
+            as file:
                 line = file.readline()
                 while line:
                     parameters["Excluded list"].append(line.lower().strip())
                     line = file.readline()
         else:
-            logging.critical("Parameter error: '%s' is not an existing or readable file name", parameters["Excluded filename"])
+            logging.critical(
+                "Parameter error: '%s' is not an existing or readable file name",
+                parameters["Excluded filename"]
+            )
             exit_status = 1
 
     # Process a single database
@@ -426,17 +397,24 @@ def main():
         if os.path.isfile(parameters["Filename"]):
             process_file(parameters["Filename"])
         else:
-            logging.critical("Parameter error: '%s' is not an existing or readable file name", parameters["Filename"])
+            logging.critical(
+                "Parameter error: '%s' is not an existing or readable file name",
+                parameters["Filename"]
+            )
             exit_status = 1
 
     # Process multiple databases
     if parameters["Dirname"]:
         if os.path.isdir(parameters["Dirname"]):
             for item_name in os.listdir(parameters["Dirname"]):
-                if os.path.isfile(parameters["Dirname"] + os.sep + item_name) and (item_name.endswith(".db") or item_name.endswith(".db.gz")):
+                if os.path.isfile(parameters["Dirname"] + os.sep + item_name) \
+                and ".db" in item_name:
                     process_file(parameters["Dirname"] + os.sep + item_name)
         else:
-            logging.critical("Parameter error: '%s' is not an existing or readable directory name", parameters["Dirname"])
+            logging.critical(
+                "Parameter error: '%s' is not an existing or readable directory name",
+                parameters["Dirname"]
+            )
             exit_status = 1
 
     # Print summary
@@ -445,7 +423,7 @@ def main():
             print()
             print("Matching records summary:")
             for key, value in parameters["Summary"].items():
-                print("    {}: {}".format(key, value))
+                print(f"    {key}: {value}")
     else:
         logging.error("You didn't provide any database to use!")
         exit_status = 1
